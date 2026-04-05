@@ -10,12 +10,18 @@ export {
   generatePackageJson,
   generateAppConfig,
   generateMountPlan,
+  generateDockerfile,
+  generateDeployYml,
+  generateEnvExample,
 } from '../lib/builders/app.js';
 
 import {
   generateBootJs,
   generatePackageJson,
   generateMountPlan,
+  generateDockerfile,
+  generateDeployYml,
+  generateEnvExample,
 } from '../lib/builders/app.js';
 
 export default async function newApp() {
@@ -88,7 +94,7 @@ export default async function newApp() {
     writeFileSync(join(appDir, 'package.json'), generatePackageJson(name, { shell: 'none' }));
 
     // .gitignore
-    writeFileSync(join(appDir, '.gitignore'), 'node_modules/\ndata/\n.bundles/\nbundle.lock\n*.sqlite3\n.torque/\n');
+    writeFileSync(join(appDir, '.gitignore'), 'node_modules/\ndata/\n.bundles/\nbundle.lock\n*.sqlite3\n.torque/\n.env\n');
 
     // README
     writeFileSync(join(appDir, 'README.md'), `# ${name}
@@ -126,6 +132,12 @@ data/          SQLite database (auto-created)
       writeFileSync(join(appDir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
       applyTemplate(appDir, selectedTemplate);
     }
+
+    // Deployment files (always generated)
+    writeFileSync(join(appDir, 'Dockerfile'), generateDockerfile());
+    mkdirSync(join(appDir, 'config'), { recursive: true });
+    writeFileSync(join(appDir, 'config', 'deploy.yml'), generateDeployYml());
+    writeFileSync(join(appDir, '.env.example'), generateEnvExample());
 
     spin.succeed('App created');
   } catch (err) {

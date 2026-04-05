@@ -183,3 +183,32 @@ test('api-only template has seeds/index.js', () => {
     'seeds/index.js should exist'
   );
 });
+
+// ── Deployment file generators ────────────────────────────────────────────────
+
+import { generateDockerfile, generateDeployYml, generateEnvExample } from '../lib/builders/app.js';
+
+test('generateDockerfile() produces valid Dockerfile', () => {
+  const dockerfile = generateDockerfile();
+  assert.ok(dockerfile.includes('FROM node:'), 'should include FROM node:');
+  assert.ok(dockerfile.includes('WORKDIR /app'), 'should include WORKDIR /app');
+  assert.ok(dockerfile.includes('VOLUME /app/data'), 'should include VOLUME /app/data');
+  assert.ok(dockerfile.includes('EXPOSE 9292'), 'should include EXPOSE 9292');
+  assert.ok(dockerfile.includes('CMD'), 'should include CMD');
+  assert.ok(dockerfile.includes('torque-data:/app/data'), 'should include torque-data:/app/data mount reference');
+});
+
+test('generateDeployYml() produces valid deploy config', () => {
+  const deployYml = generateDeployYml();
+  assert.ok(deployYml.includes('server:'), 'should include server:');
+  assert.ok(deployYml.includes('user: deploy'), 'should include user: deploy');
+  assert.ok(deployYml.includes('port: 9292'), 'should include port: 9292');
+  assert.ok(deployYml.includes('# registry:'), 'should include commented-out # registry:');
+});
+
+test('generateEnvExample() produces .env template', () => {
+  const envExample = generateEnvExample();
+  assert.ok(envExample.includes('AUTH_SECRET='), 'should include AUTH_SECRET=');
+  assert.ok(envExample.includes('NODE_ENV='), 'should include NODE_ENV=');
+  assert.ok(envExample.includes('PORT='), 'should include PORT=');
+});
