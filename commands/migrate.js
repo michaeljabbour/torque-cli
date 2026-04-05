@@ -102,6 +102,17 @@ async function migrateGenerate() {
   return 0;
 }
 
+function ensureMigrationsTable(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _torque_migrations (
+      id TEXT PRIMARY KEY,
+      bundle TEXT NOT NULL,
+      name TEXT NOT NULL,
+      applied_at TEXT NOT NULL
+    )
+  `);
+}
+
 async function migrateRun() {
   const appDir = resolve(process.cwd());
 
@@ -115,14 +126,7 @@ async function migrateRun() {
     });
 
     // Ensure migration tracking table
-    dataLayer.db.exec(`
-      CREATE TABLE IF NOT EXISTS _torque_migrations (
-        id TEXT PRIMARY KEY,
-        bundle TEXT NOT NULL,
-        name TEXT NOT NULL,
-        applied_at TEXT NOT NULL
-      )
-    `);
+    ensureMigrationsTable(dataLayer.db);
 
     const applied = new Set(
       dataLayer.db.prepare('SELECT name FROM _torque_migrations').all().map(r => r.name)
@@ -218,14 +222,7 @@ async function migrateRollback() {
     });
 
     // Ensure migration tracking table exists
-    dataLayer.db.exec(`
-      CREATE TABLE IF NOT EXISTS _torque_migrations (
-        id TEXT PRIMARY KEY,
-        bundle TEXT NOT NULL,
-        name TEXT NOT NULL,
-        applied_at TEXT NOT NULL
-      )
-    `);
+    ensureMigrationsTable(dataLayer.db);
 
     const last = getLastMigration(dataLayer.db);
     if (!last) {

@@ -95,9 +95,6 @@ test('full rollback calls down() and removes the tracking row', async () => {
   const tempDir = join(tmpdir(), `torque-rollback-test-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
 
-  // Track whether down() was called
-  let downCalled = false;
-
   // Create a temp migration file with up() and down() exports
   const migrationPath = join(tempDir, '001_create_test_table.js');
   writeFileSync(migrationPath, `
