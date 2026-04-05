@@ -127,10 +127,10 @@ test('dev.js restricts watching to source repos, not .bundles/', () => {
   );
 });
 
-test('dev.js watch mode note mentions bundle changes require manual restart', () => {
+test('dev.js watch mode note mentions hot reload for bundles', () => {
   assert.match(
     DEV_SRC,
-    /Bundle.*changes require a manual restart/i,
-    'dev.js watch mode note must mention that bundle changes require a manual restart'
+    /hot.?reload/i,
+    'dev.js watch mode note must mention hot reload for bundles'
   );
 });

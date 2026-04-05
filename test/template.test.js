@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { listTemplates, getTemplate } from '../lib/templates.js';
+import { tmpdir } from 'node:os';
+import { listTemplates, getTemplate, applyTemplate } from '../lib/templates.js';
 import { generateDockerfile, generateDeployYml, generateEnvExample } from '../lib/builders/app.js';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -183,6 +184,53 @@ test('api-only template has seeds/index.js', () => {
     existsSync(join(tmpl.dir, 'seeds', 'index.js')),
     'seeds/index.js should exist'
   );
+});
+
+// ── applyTemplate does not pre-create .bundles/ (conflicts with git resolver) ─────────────────────────
+
+test('applyTemplate does not create .bundles/ directories for standard template (breaks git resolver)', () => {
+  const tmpDir = join(tmpdir(), `torque-test-apply-${Date.now()}`);
+  mkdirSync(tmpDir, { recursive: true });
+  try {
+    const template = getTemplate('standard');
+    applyTemplate(tmpDir, template);
+    assert.ok(
+      !existsSync(join(tmpDir, '.bundles')),
+      '.bundles/ must not be pre-created by applyTemplate — the git resolver does git-fetch on existing dirs, not clone'
+    );
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('applyTemplate does not create .bundles/ directories for api-only template', () => {
+  const tmpDir = join(tmpdir(), `torque-test-apply-api-${Date.now()}`);
+  mkdirSync(tmpDir, { recursive: true });
+  try {
+    const template = getTemplate('api-only');
+    applyTemplate(tmpDir, template);
+    assert.ok(
+      !existsSync(join(tmpDir, '.bundles')),
+      '.bundles/ must not be pre-created by applyTemplate for api-only template'
+    );
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('applyTemplate does not create .bundles/ directories for kanban template', () => {
+  const tmpDir = join(tmpdir(), `torque-test-apply-kanban-${Date.now()}`);
+  mkdirSync(tmpDir, { recursive: true });
+  try {
+    const template = getTemplate('kanban');
+    applyTemplate(tmpDir, template);
+    assert.ok(
+      !existsSync(join(tmpDir, '.bundles')),
+      '.bundles/ must not be pre-created by applyTemplate for kanban template'
+    );
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 });
 
 // ── Deployment file generators ────────────────────────────────────────────────

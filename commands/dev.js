@@ -76,7 +76,7 @@ export default async function dev() {
 
   // Step 7: Print watch mode note
   console.log(
-    'Watching: boot.js and bundles/ for changes. Bundle config changes require a manual restart.'
+    'Watching: boot.js for changes (hot reload). Bundles are hot-reloaded without process restart.'
   );
 
   // Step 8: Spawn node with --watch-path flags to avoid watching .bundles/
@@ -84,7 +84,6 @@ export default async function dev() {
   // if running inside a monorepo workspace for framework development.
   const watchArgs = [
     '--watch-path', 'boot.js',
-    '--watch-path', 'bundles',
   ];
 
   // In monorepo development, also watch framework packages
@@ -102,6 +101,7 @@ export default async function dev() {
         ...process.env,
         ...(result.planPath ? { MOUNT_PLAN: result.planPath } : {}),
         PORT: port,
+        HOT_RELOAD: '1',
       },
     });
     child.on('close', (code) => resolve(code));
