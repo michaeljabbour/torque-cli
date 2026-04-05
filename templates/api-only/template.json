@@ -1,0 +1,11 @@
+{
+  "name": "api-only",
+  "description": "Headless API server — pipeline and tasks with no UI shell. For custom frontends or mobile apps.",
+  "identity": true,
+  "shell": "none",
+  "auth": true,
+  "bundles": {
+    "pipeline": "git+https://github.com/michaeljabbour/torque-bundle-pipeline.git@main",
+    "tasks": "git+https://github.com/michaeljabbour/torque-bundle-tasks.git@main"
+  }
+}

@@ -7,6 +7,8 @@ import { listTemplates, getTemplate } from '../lib/templates.js';
 const ROOT = new URL('..', import.meta.url).pathname;
 
 const EXPECTED_BUNDLES = ['iam', 'kanban-app', 'activity-app', 'search-app'];
+const STANDARD_BUNDLES = ['pipeline', 'pulse', 'tasks'];
+const API_ONLY_BUNDLES = ['pipeline', 'tasks'];
 
 // ── listTemplates ────────────────────────────────────────────────────────
 
@@ -107,5 +109,77 @@ test('minimal template has config/app.js', () => {
   assert.ok(
     existsSync(join(tmpl.dir, 'config', 'app.js')),
     'config/app.js should exist'
+  );
+});
+
+// ── standard template ────────────────────────────────────────────────────────
+
+test('getTemplate("standard") returns correct metadata', () => {
+  const tmpl = getTemplate('standard');
+  assert.ok(tmpl, 'should return the standard template');
+  assert.equal(tmpl.name, 'standard');
+  assert.equal(tmpl.identity, true, 'identity should be true');
+  assert.equal(tmpl.shell, 'none', 'shell should be none');
+  const bundleNames = Object.keys(tmpl.bundles).sort();
+  assert.deepEqual(bundleNames, [...STANDARD_BUNDLES].sort());
+});
+
+test('standard template bundles all point to git sources', () => {
+  const tmpl = getTemplate('standard');
+  for (const [name, source] of Object.entries(tmpl.bundles)) {
+    assert.ok(
+      source.startsWith('git+https://'),
+      `bundle "${name}" should use a git+ source, got: ${source}`
+    );
+  }
+});
+
+test('standard template has seeds/index.js', () => {
+  const tmpl = getTemplate('standard');
+  assert.ok(
+    existsSync(join(tmpl.dir, 'seeds', 'index.js')),
+    'seeds/index.js should exist'
+  );
+});
+
+test('standard template has per-bundle seeds', () => {
+  const tmpl = getTemplate('standard');
+  assert.ok(
+    existsSync(join(tmpl.dir, 'bundles', 'pipeline', 'seeds.js')),
+    'bundles/pipeline/seeds.js should exist'
+  );
+  assert.ok(
+    existsSync(join(tmpl.dir, 'bundles', 'tasks', 'seeds.js')),
+    'bundles/tasks/seeds.js should exist'
+  );
+});
+
+// ── api-only template ────────────────────────────────────────────────────────
+
+test('getTemplate("api-only") returns correct metadata', () => {
+  const tmpl = getTemplate('api-only');
+  assert.ok(tmpl, 'should return the api-only template');
+  assert.equal(tmpl.name, 'api-only');
+  assert.equal(tmpl.identity, true, 'identity should be true');
+  assert.equal(tmpl.shell, 'none', 'shell should be none');
+  const bundleNames = Object.keys(tmpl.bundles).sort();
+  assert.deepEqual(bundleNames, [...API_ONLY_BUNDLES].sort());
+});
+
+test('api-only template bundles all point to git sources', () => {
+  const tmpl = getTemplate('api-only');
+  for (const [name, source] of Object.entries(tmpl.bundles)) {
+    assert.ok(
+      source.startsWith('git+https://'),
+      `bundle "${name}" should use a git+ source, got: ${source}`
+    );
+  }
+});
+
+test('api-only template has seeds/index.js', () => {
+  const tmpl = getTemplate('api-only');
+  assert.ok(
+    existsSync(join(tmpl.dir, 'seeds', 'index.js')),
+    'seeds/index.js should exist'
   );
 });

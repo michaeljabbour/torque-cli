@@ -1,0 +1,12 @@
+{
+  "name": "standard",
+  "description": "Deal tracker with pipeline, activity feed, and tasks — a real working business app",
+  "identity": true,
+  "shell": "none",
+  "auth": true,
+  "bundles": {
+    "pipeline": "git+https://github.com/michaeljabbour/torque-bundle-pipeline.git@main",
+    "pulse": "git+https://github.com/michaeljabbour/torque-bundle-pulse.git@main",
+    "tasks": "git+https://github.com/michaeljabbour/torque-bundle-tasks.git@main"
+  }
+}
