@@ -64,7 +64,7 @@ export default async function newApp() {
       const templateChoice = await select({
         message: 'Template',
         choices: templateChoices,
-        default: templates.length > 0 ? templates[0].name : 'none',
+        default: templates.find(t => t.name === 'standard') ? 'standard' : templates[0]?.name || 'none',
       });
 
       if (templateChoice !== 'none') {
