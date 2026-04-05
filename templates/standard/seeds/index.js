@@ -42,7 +42,6 @@ for (const u of [
 }
 
 const as1 = ctx(users[0]);
-const as2 = ctx(users[1]);
 
 // ── 2. Pipeline deals ─────────────────────────────────────────────────────────
 
@@ -60,7 +59,7 @@ for (const deal of deals) {
   try {
     pr.createDeal(as1({ name: deal.name, value: deal.value, stage: deal.stage }));
     console.log(`   ${deal.name} — $${deal.value} (${deal.stage})`);
-  } catch (e) { console.log(`   (skipped deal ${deal.name}: ${e.message})`); }
+  } catch (e) { console.warn(`   (skipped deal ${deal.name}: ${e.message})`); }
 }
 
 // ── 3. Tasks ──────────────────────────────────────────────────────────────────
@@ -80,7 +79,7 @@ for (const task of taskList) {
   try {
     tr.createTask(as1({ title: task.title, priority: task.priority, due_date: task.due }));
     console.log(`   ${task.title} (${task.priority})`);
-  } catch (e) { console.log(`   (skipped task ${task.title}: ${e.message})`); }
+  } catch (e) { console.warn(`   (skipped task ${task.title}: ${e.message})`); }
 }
 
 console.log('\n========================================');
