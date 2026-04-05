@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { listTemplates, getTemplate } from '../lib/templates.js';
+import { generateDockerfile, generateDeployYml, generateEnvExample } from '../lib/builders/app.js';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 
@@ -185,8 +186,6 @@ test('api-only template has seeds/index.js', () => {
 });
 
 // ── Deployment file generators ────────────────────────────────────────────────
-
-import { generateDockerfile, generateDeployYml, generateEnvExample } from '../lib/builders/app.js';
 
 test('generateDockerfile() produces valid Dockerfile', () => {
   const dockerfile = generateDockerfile();
