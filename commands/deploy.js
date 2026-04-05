@@ -8,6 +8,7 @@ import chalk from 'chalk';
  * Parse the config/deploy.yml content into a deploy config object.
  * @param {string} yamlContent - Raw YAML content from config/deploy.yml
  * @returns {{ server: string, user: string, port: number, registry?: string, env: object }}
+ *   env: available to callers; runtime vars are passed via --env-file .env on the server
  */
 export function parseDeployConfig(yamlContent) {
   const raw = yamlLoad(yamlContent) ?? {};
@@ -44,20 +45,14 @@ export function buildDeployCommands(appName, config) {
     ].join(' ');
   }
 
-  const runBase = [
-    `ssh ${ssh} 'docker stop ${containerName} 2>/dev/null || true`,
+  // All commands run on the remote server via a single SSH session
+  const remoteCommands = [
+    `docker stop ${containerName} 2>/dev/null || true`,
     `docker rm ${containerName} 2>/dev/null || true`,
-  ];
-
-  if (registry) {
-    runBase.push(`docker pull ${imageTag}`);
-  }
-
-  runBase.push(
-    `docker run -d --name ${containerName} --restart unless-stopped -p ${port}:${port} -v torque-data:/app/data --env-file .env ${imageTag}'`
-  );
-
-  const run = runBase.join(' && ');
+    ...(registry ? [`docker pull ${imageTag}`] : []),
+    `docker run -d --name ${containerName} --restart unless-stopped -p ${port}:${port} -v torque-data:/app/data --env-file .env ${imageTag}`,
+  ].join(' && ');
+  const run = `ssh ${ssh} '${remoteCommands}'`;
 
   return { build, transfer, run };
 }
@@ -68,7 +63,7 @@ export function buildDeployCommands(appName, config) {
  * @returns {Promise<number>} Exit code — 0 on success, 1 on failure
  */
 export default async function deploy() {
-  const cwd = resolve(process.cwd());
+  const cwd = process.cwd();
   const configPath = resolve(cwd, 'config', 'deploy.yml');
   const dockerfilePath = resolve(cwd, 'Dockerfile');
   const appName = basename(cwd);
