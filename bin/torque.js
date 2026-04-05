@@ -9,6 +9,7 @@ const COMMANDS = {
   start:     { desc: 'Start the server',                             alias: 's',  cat: 'create',   icon: '▶' },
   dev:       { desc: 'Start in watch mode (auto-restart)',           alias: 'd',  cat: 'create',   icon: '↻' },
   seed:      { desc: 'Run per-bundle seed files',                    alias: null, cat: 'create',   icon: '⟡' },
+  deploy:    { desc: 'Deploy to production (single VPS)',            alias: null, cat: 'create',   icon: '▲' },
   generate:  { desc: 'Scaffold bundles, CRUD, views',                alias: 'g',  cat: 'build',    icon: '◈' },
   validate:  { desc: 'Check composability & contracts',              alias: 'v',  cat: 'build',    icon: '✓' },
   doctor:    { desc: 'Diagnose project health',                      alias: null, cat: 'build',    icon: '⚕' },
