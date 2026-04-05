@@ -9,6 +9,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import yaml from 'js-yaml';
 import { importFromProject } from '../lib/resolve.js';
 
@@ -157,7 +158,7 @@ async function migrateRun() {
 
           dataLayer.db.prepare(
             'INSERT INTO _torque_migrations (id, bundle, name, applied_at) VALUES (?, ?, ?, ?)'
-          ).run(crypto.randomUUID(), name, fullKey, new Date().toISOString());
+          ).run(randomUUID(), name, fullKey, new Date().toISOString());
           total++;
         } catch (err) {
           console.error(`  FAILED: ${err.message}`);
@@ -281,6 +282,8 @@ async function migratePreview() {
   const bundleDirs = readdirSync(bundlesDir, { withFileTypes: true })
     .filter(d => d.isDirectory());
 
+  // Note: shows all migration files, not filtered by applied status.
+  // To see only pending migrations, run `migrate:status`.
   console.log('Pending migrations (preview — not applied):');
   let total = 0;
 
@@ -294,10 +297,14 @@ async function migratePreview() {
 
     for (const file of migrations) {
       const filePath = join(migrationsDir, file);
-      const content = readFileSync(filePath, 'utf8');
-      console.log(`\n── ${bd.name}/${file} ──`);
-      console.log(content);
-      total++;
+      try {
+        const content = readFileSync(filePath, 'utf8');
+        console.log(`\n── ${bd.name}/${file} ──`);
+        console.log(content);
+        total++;
+      } catch (err) {
+        console.warn(`  Warning: could not read ${file}: ${err.message}`);
+      }
     }
   }
 
@@ -409,6 +416,9 @@ const SQL_TYPE_MAP = {
   boolean: 'INTEGER', float: 'REAL', timestamp: 'TEXT', text: 'TEXT',
 };
 
+/** SQL types that accept unquoted numeric DEFAULT values. */
+const NUMERIC_SQL_TYPES = new Set(['INTEGER', 'REAL']);
+
 /**
  * Builds a SQL column definition string from a column name and spec.
  * @param {string} name - Column name
@@ -424,8 +434,7 @@ function buildColDef(name, spec, typeOverride) {
   if (s.null === false) def += ' NOT NULL';
   if (s.unique) def += ' UNIQUE';
   if (s.default !== undefined) {
-    const numericSqlTypes = new Set(['INTEGER', 'REAL']);
-    if (numericSqlTypes.has(sqlType)) {
+    if (NUMERIC_SQL_TYPES.has(sqlType)) {
       def += ` DEFAULT ${s.default}`;
     } else {
       const escaped = String(s.default).replace(/'/g, "''");
