@@ -56,11 +56,9 @@ const deals = [
   { name: 'Umbrella Ltd', value: 200000, stage: 'closed_won' },
 ];
 
-const createdDeals = [];
 for (const deal of deals) {
   try {
-    const r = pr.createDeal(as1({ name: deal.name, value: deal.value, stage: deal.stage }));
-    createdDeals.push(r.data);
+    pr.createDeal(as1({ name: deal.name, value: deal.value, stage: deal.stage }));
     console.log(`   ${deal.name} — $${deal.value} (${deal.stage})`);
   } catch (e) { console.log(`   (skipped deal ${deal.name}: ${e.message})`); }
 }

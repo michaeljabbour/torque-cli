@@ -24,10 +24,14 @@ const ctx = (user) => (body = {}, params = {}) => ({ body, params, currentUser: 
 // ── 1. Demo user ──────────────────────────────────────────────────────────────
 
 console.log('1. Creating demo user...');
-const result = iam.routes().signUp({
-  body: { email: 'demo@example.com', password: 'demo1234', name: 'Demo User' },
-});
-const user = result.data.user;
+let user;
+try {
+  const result = iam.routes().signUp({ body: { email: 'demo@example.com', password: 'demo1234', name: 'Demo User' } });
+  user = result.data.user;
+} catch (e) {
+  console.error(`Failed to create demo user: ${e.message}`);
+  process.exit(1);
+}
 console.log('   demo@example.com (pwd: demo1234)');
 
 const as1 = ctx(user);
