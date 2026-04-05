@@ -16,7 +16,6 @@ const { registry } = await boot({
 
 const iam = registry.bundleInstance('identity');
 const pipeline = registry.bundleInstance('pipeline');
-const pulse = registry.bundleInstance('pulse');
 const tasks = registry.bundleInstance('tasks');
 
 console.log('Seeding standard app...\n');
@@ -32,10 +31,14 @@ for (const u of [
   { email: 'admin@example.com', name: 'Admin', bio: 'Account admin' },
   { email: 'sales@example.com', name: 'Sales Rep', bio: 'Sales team' },
 ]) {
-  const s = iam.routes().signUp({ body: { email: u.email, password: 'demo1234', name: u.name } });
-  users.push(s.data.user);
-  console.log(`   ${u.email} (pwd: demo1234)`);
-  try { iam.routes().updateProfile({ body: { display_name: u.name, bio: u.bio }, currentUser: s.data.user }); } catch {}
+  try {
+    const s = iam.routes().signUp({ body: { email: u.email, password: 'demo1234', name: u.name } });
+    users.push(s.data.user);
+    console.log(`   ${u.email} (pwd: demo1234)`);
+    try {
+      iam.routes().updateProfile({ body: { display_name: u.name, bio: u.bio }, currentUser: s.data.user });
+    } catch { /* profile update is optional — ignore */ }
+  } catch (e) { console.error(`Failed to create user ${u.email}: ${e.message}`); process.exit(1); }
 }
 
 const as1 = ctx(users[0]);
