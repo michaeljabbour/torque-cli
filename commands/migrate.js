@@ -18,13 +18,15 @@ export default async function migrate() {
   if (sub === 'run' || sub === ':run') return migrateRun();
   if (sub === 'status' || sub === ':status') return migrateStatus();
   if (sub === 'rollback' || sub === ':rollback') return migrateRollback();
+  if (sub === 'preview' || sub === ':preview') return migratePreview();
 
-  console.log('Usage: torque migrate <generate|run|status|rollback>');
+  console.log('Usage: torque migrate <generate|run|status|rollback|preview>');
   console.log('');
   console.log('  generate   Diff manifest schemas against DB, create migration files');
   console.log('  run        Apply pending migrations in dependency order');
   console.log('  status     Show migration status per bundle');
   console.log('  rollback   Rollback the last applied migration');
+  console.log('  preview    Preview pending migrations without applying them');
   return 1;
 }
 
@@ -207,8 +209,122 @@ async function migrateStatus() {
 }
 
 async function migrateRollback() {
-  console.log('Rollback: not yet implemented. Manually reverse the last migration.');
+  try {
+    const { boot } = await importFromProject('@torquedev/core/boot');
+    const { dataLayer } = await boot({
+      db: process.env.DB_PATH || 'data/dev.sqlite3',
+      serve: false,
+      silent: true,
+    });
+
+    // Ensure migration tracking table exists
+    dataLayer.db.exec(`
+      CREATE TABLE IF NOT EXISTS _torque_migrations (
+        id TEXT PRIMARY KEY,
+        bundle TEXT NOT NULL,
+        name TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      )
+    `);
+
+    const last = getLastMigration(dataLayer.db);
+    if (!last) {
+      console.log('Nothing to rollback — no migrations have been applied.');
+      return 0;
+    }
+
+    // name format: "bundle/NNN_description.js"
+    const slashIdx = last.name.indexOf('/');
+    if (slashIdx === -1) {
+      console.error(`Invalid migration name format: ${last.name}`);
+      return 1;
+    }
+    const bundleName = last.name.slice(0, slashIdx);
+    const fileName = last.name.slice(slashIdx + 1);
+
+    const appDir = resolve(process.cwd());
+    const migrationPath = join(appDir, 'bundles', bundleName, 'migrations', fileName);
+
+    if (!existsSync(migrationPath)) {
+      console.error(`Migration file not found: ${migrationPath}`);
+      return 1;
+    }
+
+    const mod = await import(migrationPath);
+    if (typeof mod.down !== 'function') {
+      console.error(`Migration ${last.name} does not export a down() function.`);
+      return 1;
+    }
+
+    console.log(`  Rolling back ${last.name}...`);
+
+    const rollback = dataLayer.db.transaction(() => {
+      mod.down(dataLayer.db);
+      removeMigrationRecord(dataLayer.db, last.name);
+    });
+    rollback();
+
+    console.log('Rollback complete.');
+  } catch (err) {
+    console.error('Rollback error:', err.message);
+    return 1;
+  }
   return 0;
+}
+
+async function migratePreview() {
+  const appDir = resolve(process.cwd());
+  const bundlesDir = join(appDir, 'bundles');
+
+  if (!existsSync(bundlesDir)) {
+    console.error('No bundles/ directory found.');
+    return 1;
+  }
+
+  const bundleDirs = readdirSync(bundlesDir, { withFileTypes: true })
+    .filter(d => d.isDirectory());
+
+  console.log('Pending migrations (preview — not applied):');
+  let total = 0;
+
+  for (const bd of bundleDirs) {
+    const migrationsDir = join(bundlesDir, bd.name, 'migrations');
+    if (!existsSync(migrationsDir)) continue;
+
+    const migrations = readdirSync(migrationsDir)
+      .filter(f => f.match(/^\d{3}_.*\.js$/))
+      .sort();
+
+    for (const file of migrations) {
+      console.log(`  ${bd.name}/${file}`);
+      total++;
+    }
+  }
+
+  if (total === 0) {
+    console.log('  (none)');
+  }
+  return 0;
+}
+
+/**
+ * Returns the most recently applied migration row, or null if none.
+ * @param {import('better-sqlite3').Database} db
+ */
+export function getLastMigration(db) {
+  const row = db.prepare(
+    'SELECT * FROM _torque_migrations ORDER BY applied_at DESC, rowid DESC LIMIT 1'
+  ).get();
+  return row ?? null;
+}
+
+/**
+ * Deletes a migration tracking record by name.
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} name  e.g. "bundle/001_create_users.js"
+ */
+export function removeMigrationRecord(db, name) {
+  db.prepare('DELETE FROM _torque_migrations WHERE name = ?').run(name);
 }
 
 // ── Schema diffing ─────────────────────────────────────────
