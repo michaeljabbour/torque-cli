@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
 
-import { getLastMigration, removeMigrationRecord } from '../commands/migrate.js';
+import { getLastMigration, removeMigrationRecord, diffSchema, generateMigrationCode } from '../commands/migrate.js';
 
 // Helper: create and seed the _torque_migrations tracking table
 function createMigrationsDb() {
@@ -147,4 +147,94 @@ export function down(db) {
   // Cleanup
   db.close();
   rmSync(tempDir, { recursive: true, force: true });
+});
+
+// ── Test 5: diffSchema detects column type change ───────────────────────────
+
+test('diffSchema detects column type change (string->integer)', () => {
+  const current = {
+    users: {
+      columns: {
+        id: { type: 'uuid', primary: true },
+        age: { type: 'integer' },
+      },
+    },
+  };
+  const previous = {
+    users: {
+      columns: {
+        id: { type: 'uuid', primary: true },
+        age: { type: 'string' },
+      },
+    },
+  };
+
+  const changes = diffSchema(current, previous);
+  const typeChange = changes.find(c => c.type === 'change_column_type');
+
+  assert.ok(typeChange, 'should detect a change_column_type entry');
+  assert.strictEqual(typeChange.table, 'users', 'table should be users');
+  assert.strictEqual(typeChange.column, 'age', 'column should be age');
+  assert.strictEqual(typeChange.from, 'string', 'from should be string');
+  assert.strictEqual(typeChange.to, 'integer', 'to should be integer');
+});
+
+// ── Test 6: diffSchema does not flag same type as a change ──────────────────
+
+test('diffSchema does not flag same type as a change', () => {
+  const current = {
+    users: {
+      columns: {
+        id: { type: 'uuid', primary: true },
+        name: { type: 'string' },
+      },
+    },
+  };
+  const previous = {
+    users: {
+      columns: {
+        id: { type: 'uuid', primary: true },
+        name: { type: 'string' },
+      },
+    },
+  };
+
+  const changes = diffSchema(current, previous);
+  const typeChange = changes.find(c => c.type === 'change_column_type');
+
+  assert.strictEqual(typeChange, undefined, 'should not detect a type change when types are the same');
+});
+
+// ── Test 7: generateMigrationCode for type changes includes rebuild pattern ─
+
+test('generateMigrationCode for type changes includes table rebuild pattern', () => {
+  const changes = [
+    {
+      type: 'change_column_type',
+      table: 'users',
+      column: 'age',
+      from: 'string',
+      to: 'integer',
+      allColumns: {
+        id: { type: 'uuid', primary: true },
+        age: { type: 'integer' },
+      },
+      description: 'Change column users.age from string to integer',
+    },
+  ];
+
+  const code = generateMigrationCode('auth', changes);
+
+  assert.ok(code.includes('change_column_type'), 'should include change_column_type in comment');
+  assert.ok(code.includes('export function up(db)'), 'should include up(db) function');
+  assert.ok(code.includes('export function down(db)'), 'should include down(db) function');
+  // SQLite table-rebuild pattern: CREATE temp, INSERT, DROP, RENAME
+  assert.ok(code.includes('_temp'), 'should use a temp table for rebuild');
+});
+
+// ── Test 8: preview subcommand is recognized (default export is a function) ─
+
+test('preview subcommand is recognized (default export is a function)', async () => {
+  const mod = await import('../commands/migrate.js');
+  assert.strictEqual(typeof mod.default, 'function', 'default export should be a function');
 });

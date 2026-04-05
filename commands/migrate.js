@@ -293,7 +293,10 @@ async function migratePreview() {
       .sort();
 
     for (const file of migrations) {
-      console.log(`  ${bd.name}/${file}`);
+      const filePath = join(migrationsDir, file);
+      const content = readFileSync(filePath, 'utf8');
+      console.log(`\n── ${bd.name}/${file} ──`);
+      console.log(content);
       total++;
     }
   }
@@ -326,7 +329,7 @@ export function removeMigrationRecord(db, name) {
 
 // ── Schema diffing ─────────────────────────────────────────
 
-function diffSchema(current, previous) {
+export function diffSchema(current, previous) {
   const changes = [];
 
   // New tables
@@ -354,6 +357,22 @@ function diffSchema(current, previous) {
           spec: colDef,
           description: `Add column ${tableName}.${colName}`,
         });
+      } else {
+        // Type change detection
+        const currentType = typeof colDef === 'string' ? colDef : colDef.type;
+        const prevColDef = prevCols[colName];
+        const prevType = typeof prevColDef === 'string' ? prevColDef : prevColDef.type;
+        if (currentType !== prevType) {
+          changes.push({
+            type: 'change_column_type',
+            table: tableName,
+            column: colName,
+            from: prevType,
+            to: currentType,
+            allColumns: currentCols,
+            description: `Change column ${tableName}.${colName} from ${prevType} to ${currentType}`,
+          });
+        }
       }
     }
 
@@ -384,7 +403,7 @@ function diffSchema(current, previous) {
   return changes;
 }
 
-function generateMigrationCode(bundleName, changes) {
+export function generateMigrationCode(bundleName, changes) {
   const prefix = `${bundleName}_`;
   let upLines = [];
   let downLines = [];
@@ -412,6 +431,45 @@ function generateMigrationCode(bundleName, changes) {
       if (s.default !== undefined) colDef += ` DEFAULT '${s.default}'`;
       upLines.push(`  db.exec('ALTER TABLE "${fullTable}" ADD COLUMN ${colDef}');`);
       downLines.push(`  // Cannot DROP COLUMN in SQLite — manual step`);
+    } else if (change.type === 'change_column_type') {
+      const tempTable = `${fullTable}_temp`;
+      const typeMap = { uuid: 'TEXT', string: 'TEXT', integer: 'INTEGER', boolean: 'INTEGER', float: 'REAL', timestamp: 'TEXT', text: 'TEXT' };
+      // Build new-type column definitions (for up())
+      const upCols = Object.entries(change.allColumns).map(([name, spec]) => {
+        const s = typeof spec === 'string' ? { type: spec } : spec;
+        const sqlType = typeMap[s.type] || 'TEXT';
+        let def = `"${name}" ${sqlType}`;
+        if (s.primary) def += ' PRIMARY KEY';
+        if (s.null === false) def += ' NOT NULL';
+        if (s.unique) def += ' UNIQUE';
+        if (s.default !== undefined) def += ` DEFAULT '${s.default}'`;
+        return def;
+      });
+      // Build old-type column definitions (for down()) -- swap changed column back to `from` type
+      const downCols = Object.entries(change.allColumns).map(([name, spec]) => {
+        const s = typeof spec === 'string' ? { type: spec } : spec;
+        const effectiveType = name === change.column ? change.from : s.type;
+        const sqlType = typeMap[effectiveType] || 'TEXT';
+        let def = `"${name}" ${sqlType}`;
+        if (s.primary) def += ' PRIMARY KEY';
+        if (s.null === false) def += ' NOT NULL';
+        if (s.unique) def += ' UNIQUE';
+        if (s.default !== undefined) def += ` DEFAULT '${s.default}'`;
+        return def;
+      });
+      const colNames = Object.keys(change.allColumns).map(n => `"${n}"`).join(', ');
+      // up(): rebuild table with new column type
+      upLines.push(`  // change_column_type: ${change.table}.${change.column} from ${change.from} to ${change.to}`);
+      upLines.push(`  db.exec('CREATE TABLE "${tempTable}" (${upCols.join(', ')})'); `);
+      upLines.push(`  db.exec('INSERT INTO "${tempTable}" SELECT ${colNames} FROM "${fullTable}"');`);
+      upLines.push(`  db.exec('DROP TABLE "${fullTable}"');`);
+      upLines.push(`  db.exec('ALTER TABLE "${tempTable}" RENAME TO "${fullTable}"');`);
+      // down(): rebuild table with original column type
+      downLines.push(`  // change_column_type reverse: ${change.table}.${change.column} from ${change.to} back to ${change.from}`);
+      downLines.push(`  db.exec('CREATE TABLE "${tempTable}" (${downCols.join(', ')})'); `);
+      downLines.push(`  db.exec('INSERT INTO "${tempTable}" SELECT ${colNames} FROM "${fullTable}"');`);
+      downLines.push(`  db.exec('DROP TABLE "${fullTable}"');`);
+      downLines.push(`  db.exec('ALTER TABLE "${tempTable}" RENAME TO "${fullTable}"');`);
     } else if (change.type === 'remove_column') {
       upLines.push(`  // TODO: Remove column "${fullTable}"."${change.column}" — requires table rebuild in SQLite`);
       downLines.push(`  // Re-add column if needed`);
