@@ -238,3 +238,39 @@ test('preview subcommand is recognized (default export is a function)', async ()
   const mod = await import('../commands/migrate.js');
   assert.strictEqual(typeof mod.default, 'function', 'default export should be a function');
 });
+
+// ── Test 9: buildColDef generates correct DEFAULT quoting ─────────────────────
+
+test('generateMigrationCode quotes DEFAULT values correctly by SQL type', () => {
+  // Numeric columns (INTEGER, REAL) must NOT wrap their default in single quotes
+  // Text columns must properly escape single quotes with ''
+  const changes = [
+    {
+      type: 'create_table',
+      table: 'items',
+      columns: {
+        count:    { type: 'integer', default: 0 },
+        score:    { type: 'float',   default: 1.5 },
+        label:    { type: 'string',  default: "it's fine" },
+        enabled:  { type: 'boolean', default: 1 },
+      },
+      description: 'Create table items',
+    },
+  ];
+
+  const code = generateMigrationCode('app', changes);
+
+  // Integer default must not be quoted
+  assert.ok(code.includes("DEFAULT 0"), 'integer default should not be quoted');
+  assert.ok(!code.includes("DEFAULT '0'"), 'integer default should not have single quotes');
+
+  // Float default must not be quoted
+  assert.ok(code.includes("DEFAULT 1.5"), 'float default should not be quoted');
+  assert.ok(!code.includes("DEFAULT '1.5'"), 'float default should not have single quotes');
+
+  // String default containing a single quote must use SQLite '' escaping
+  assert.ok(code.includes("DEFAULT 'it''s fine'"), "text default should escape single quotes with ''");
+
+  // Boolean (maps to INTEGER) default must not be quoted
+  assert.ok(code.includes("DEFAULT 1"), 'boolean default should not be quoted');
+});

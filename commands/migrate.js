@@ -423,7 +423,15 @@ function buildColDef(name, spec, typeOverride) {
   if (s.primary) def += ' PRIMARY KEY';
   if (s.null === false) def += ' NOT NULL';
   if (s.unique) def += ' UNIQUE';
-  if (s.default !== undefined) def += ` DEFAULT '${s.default}'`;
+  if (s.default !== undefined) {
+    const numericSqlTypes = new Set(['INTEGER', 'REAL']);
+    if (numericSqlTypes.has(sqlType)) {
+      def += ` DEFAULT ${s.default}`;
+    } else {
+      const escaped = String(s.default).replace(/'/g, "''");
+      def += ` DEFAULT '${escaped}'`;
+    }
+  }
   return def;
 }
 
