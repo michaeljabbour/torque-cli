@@ -1,0 +1,8 @@
+{
+  "name": "minimal",
+  "description": "Identity only — authentication with no business features. Simplest possible Torque app.",
+  "identity": true,
+  "shell": "none",
+  "auth": true,
+  "bundles": {}
+}

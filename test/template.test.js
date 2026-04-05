@@ -74,3 +74,38 @@ test('kanban template has local bundles/ directory', () => {
     'bundles/ should exist in template for local bundle overrides'
   );
 });
+
+// ── minimal template ───────────────────────────────────────────────────────────
+
+test('listTemplates() includes the minimal template', () => {
+  const templates = listTemplates();
+  const minimal = templates.find(t => t.name === 'minimal');
+  assert.ok(minimal, 'should find the minimal template');
+  assert.ok(minimal.description, 'minimal template should have a description');
+});
+
+test('getTemplate("minimal") returns correct metadata', () => {
+  const tmpl = getTemplate('minimal');
+  assert.ok(tmpl, 'should return the minimal template');
+  assert.equal(tmpl.name, 'minimal');
+  assert.equal(tmpl.identity, true, 'identity should be true');
+  assert.equal(tmpl.shell, 'none', 'shell should be none');
+  assert.equal(tmpl.auth, true, 'auth should be true');
+  assert.deepEqual(tmpl.bundles, {}, 'bundles should be empty object');
+});
+
+test('minimal template has seeds/index.js', () => {
+  const tmpl = getTemplate('minimal');
+  assert.ok(
+    existsSync(join(tmpl.dir, 'seeds', 'index.js')),
+    'seeds/index.js should exist'
+  );
+});
+
+test('minimal template has config/app.js', () => {
+  const tmpl = getTemplate('minimal');
+  assert.ok(
+    existsSync(join(tmpl.dir, 'config', 'app.js')),
+    'config/app.js should exist'
+  );
+});
