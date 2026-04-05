@@ -1,0 +1,30 @@
+{
+  "name": "@torquedev/cli",
+  "version": "0.1.1",
+  "description": "Torque command-line interface for server management and code generation",
+  "type": "module",
+  "main": "bin/torque.js",
+  "bin": {
+    "torque": "./bin/torque.js"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/torque-framework/torque-cli.git"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "peerDependencies": {
+    "@torquedev/core": ">=0.1.0"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "chalk": "^5.4.0",
+    "ora": "^8.2.0",
+    "@inquirer/prompts": "^7.5.0"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0"
+  }
+}

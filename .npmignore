@@ -1,0 +1,8 @@
+test/
+.git/
+.DS_Store
+.torque/
+*.tmp
+data/
+.bundles/
+*.sqlite3

@@ -1,0 +1,13 @@
+{
+  "name": "kanban",
+  "description": "Kanban board with workspaces, boards, lists, cards, labels, checklists, comments, search, and teams",
+  "identity": true,
+  "shell": "none",
+  "auth": true,
+  "bundles": {
+    "iam": "git+https://github.com/michaeljabbour/torque-bundle-iam.git@main",
+    "kanban-app": "git+https://github.com/michaeljabbour/torque-bundle-kanban-app.git@main",
+    "activity-app": "git+https://github.com/michaeljabbour/torque-bundle-activity-app.git@main",
+    "search-app": "git+https://github.com/michaeljabbour/torque-bundle-search-app.git@main"
+  }
+}
