@@ -403,70 +403,64 @@ export function diffSchema(current, previous) {
   return changes;
 }
 
+/** Maps manifest column types to SQLite storage types. */
+const SQL_TYPE_MAP = {
+  uuid: 'TEXT', string: 'TEXT', integer: 'INTEGER',
+  boolean: 'INTEGER', float: 'REAL', timestamp: 'TEXT', text: 'TEXT',
+};
+
+/**
+ * Builds a SQL column definition string from a column name and spec.
+ * @param {string} name - Column name
+ * @param {string|object} spec - Column spec (string type or object with type/primary/null/unique/default)
+ * @param {string} [typeOverride] - Override the column's type (used for change_column_type down())
+ */
+function buildColDef(name, spec, typeOverride) {
+  const s = typeof spec === 'string' ? { type: spec } : spec;
+  const effectiveType = typeOverride ?? s.type;
+  const sqlType = SQL_TYPE_MAP[effectiveType] ?? 'TEXT';
+  let def = `"${name}" ${sqlType}`;
+  if (s.primary) def += ' PRIMARY KEY';
+  if (s.null === false) def += ' NOT NULL';
+  if (s.unique) def += ' UNIQUE';
+  if (s.default !== undefined) def += ` DEFAULT '${s.default}'`;
+  return def;
+}
+
 export function generateMigrationCode(bundleName, changes) {
   const prefix = `${bundleName}_`;
-  let upLines = [];
-  let downLines = [];
+  const upLines = [];
+  const downLines = [];
 
   for (const change of changes) {
     const fullTable = `${prefix}${change.table}`;
 
     if (change.type === 'create_table') {
-      const cols = Object.entries(change.columns).map(([name, spec]) => {
-        const s = typeof spec === 'string' ? { type: spec } : spec;
-        const sqlType = { uuid: 'TEXT', string: 'TEXT', integer: 'INTEGER', boolean: 'INTEGER', float: 'REAL', timestamp: 'TEXT', text: 'TEXT' }[s.type] || 'TEXT';
-        let def = `"${name}" ${sqlType}`;
-        if (s.primary) def += ' PRIMARY KEY';
-        if (s.null === false) def += ' NOT NULL';
-        if (s.unique) def += ' UNIQUE';
-        if (s.default !== undefined) def += ` DEFAULT '${s.default}'`;
-        return def;
-      });
+      const cols = Object.entries(change.columns).map(([name, spec]) => buildColDef(name, spec));
       upLines.push(`  db.exec('CREATE TABLE IF NOT EXISTS "${fullTable}" (${cols.join(', ')})');`);
       downLines.push(`  db.exec('DROP TABLE IF EXISTS "${fullTable}"');`);
     } else if (change.type === 'add_column') {
-      const s = typeof change.spec === 'string' ? { type: change.spec } : change.spec;
-      const sqlType = { uuid: 'TEXT', string: 'TEXT', integer: 'INTEGER', boolean: 'INTEGER', float: 'REAL', timestamp: 'TEXT', text: 'TEXT' }[s.type] || 'TEXT';
-      let colDef = `"${change.column}" ${sqlType}`;
-      if (s.default !== undefined) colDef += ` DEFAULT '${s.default}'`;
+      const colDef = buildColDef(change.column, change.spec);
       upLines.push(`  db.exec('ALTER TABLE "${fullTable}" ADD COLUMN ${colDef}');`);
       downLines.push(`  // Cannot DROP COLUMN in SQLite — manual step`);
     } else if (change.type === 'change_column_type') {
       const tempTable = `${fullTable}_temp`;
-      const typeMap = { uuid: 'TEXT', string: 'TEXT', integer: 'INTEGER', boolean: 'INTEGER', float: 'REAL', timestamp: 'TEXT', text: 'TEXT' };
       // Build new-type column definitions (for up())
-      const upCols = Object.entries(change.allColumns).map(([name, spec]) => {
-        const s = typeof spec === 'string' ? { type: spec } : spec;
-        const sqlType = typeMap[s.type] || 'TEXT';
-        let def = `"${name}" ${sqlType}`;
-        if (s.primary) def += ' PRIMARY KEY';
-        if (s.null === false) def += ' NOT NULL';
-        if (s.unique) def += ' UNIQUE';
-        if (s.default !== undefined) def += ` DEFAULT '${s.default}'`;
-        return def;
-      });
+      const upCols = Object.entries(change.allColumns).map(([name, spec]) => buildColDef(name, spec));
       // Build old-type column definitions (for down()) -- swap changed column back to `from` type
-      const downCols = Object.entries(change.allColumns).map(([name, spec]) => {
-        const s = typeof spec === 'string' ? { type: spec } : spec;
-        const effectiveType = name === change.column ? change.from : s.type;
-        const sqlType = typeMap[effectiveType] || 'TEXT';
-        let def = `"${name}" ${sqlType}`;
-        if (s.primary) def += ' PRIMARY KEY';
-        if (s.null === false) def += ' NOT NULL';
-        if (s.unique) def += ' UNIQUE';
-        if (s.default !== undefined) def += ` DEFAULT '${s.default}'`;
-        return def;
-      });
+      const downCols = Object.entries(change.allColumns).map(([name, spec]) =>
+        buildColDef(name, spec, name === change.column ? change.from : undefined)
+      );
       const colNames = Object.keys(change.allColumns).map(n => `"${n}"`).join(', ');
       // up(): rebuild table with new column type
       upLines.push(`  // change_column_type: ${change.table}.${change.column} from ${change.from} to ${change.to}`);
-      upLines.push(`  db.exec('CREATE TABLE "${tempTable}" (${upCols.join(', ')})'); `);
+      upLines.push(`  db.exec('CREATE TABLE "${tempTable}" (${upCols.join(', ')})');`);
       upLines.push(`  db.exec('INSERT INTO "${tempTable}" SELECT ${colNames} FROM "${fullTable}"');`);
       upLines.push(`  db.exec('DROP TABLE "${fullTable}"');`);
       upLines.push(`  db.exec('ALTER TABLE "${tempTable}" RENAME TO "${fullTable}"');`);
       // down(): rebuild table with original column type
       downLines.push(`  // change_column_type reverse: ${change.table}.${change.column} from ${change.to} back to ${change.from}`);
-      downLines.push(`  db.exec('CREATE TABLE "${tempTable}" (${downCols.join(', ')})'); `);
+      downLines.push(`  db.exec('CREATE TABLE "${tempTable}" (${downCols.join(', ')})');`);
       downLines.push(`  db.exec('INSERT INTO "${tempTable}" SELECT ${colNames} FROM "${fullTable}"');`);
       downLines.push(`  db.exec('DROP TABLE "${fullTable}"');`);
       downLines.push(`  db.exec('ALTER TABLE "${tempTable}" RENAME TO "${fullTable}"');`);
